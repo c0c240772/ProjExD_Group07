@@ -52,6 +52,15 @@ class Pacman(pg.sprite.Sprite):
         self.rect.center = (self.grid_x * CELL_SIZE + CELL_SIZE//2, 
                            self.grid_y * CELL_SIZE + CELL_SIZE//2)
         self.speed = 5
+        self.move_interval_ms = 120
+        self.last_move_time = 0
+    
+    def can_move_now(self) -> bool:
+        now = pg.time.get_ticks()
+        if now - self.last_move_time >= self.move_interval_ms:
+            self.last_move_time = now
+            return True
+        return False
 
     def update(self, key_lst: list[bool], screen: pg.Surface):
         """
@@ -59,6 +68,10 @@ class Pacman(pg.sprite.Sprite):
         引数1 key_lst：押下キーの真理値リスト
         引数2 screen：画面Surface
         """
+        if not self.can_move_now():
+            screen.blit(self.image, self.rect)
+            return
+        
         for k, mv in __class__.delta.items():
             if key_lst[k]:
                 new_grid_x = self.grid_x + mv[0]
@@ -75,7 +88,6 @@ class Pacman(pg.sprite.Sprite):
                         # クッキーを食べる
                         if self.maze[self.grid_y][self.grid_x] == 0:
                             self.maze[self.grid_y][self.grid_x] = 2
-                        time.sleep(0.1)  # こうかとんの移動速度を遅くする
                 break
         
         screen.blit(self.image, self.rect)
