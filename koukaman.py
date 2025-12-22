@@ -61,6 +61,11 @@ class Pacman(pg.sprite.Sprite):
         self.direction = (1,0)
         self.fry_cooldown = 200
         self.last_fry = -200
+        self.fry_count = 3
+        icon_6 = pg.image.load("fig/6.png")
+        self.fry_icon = pg.transform.smoothscale(icon_6, (24, 24))
+        self.fry_icon_margin = 10
+        self.fry_icon_spacing = 8
 
     def can_move_now(self) -> bool:
         now = pg.time.get_ticks()
@@ -102,12 +107,25 @@ class Pacman(pg.sprite.Sprite):
                     continue
                 self.grid_x, self.grid_y = target_x, target_y # 更新する位置の設定
                 break
+        self.fry_count -= 1
         self.rect.center = (self.grid_x * CELL_SIZE + CELL_SIZE // 2,
                             self.grid_y * CELL_SIZE + CELL_SIZE // 2)  
         # クッキーを食べる
         if self.maze[self.grid_y][self.grid_x] == 0:
             self.maze[self.grid_y][self.grid_x] = 2
         screen.blit(self.image, self.rect)
+        
+    def draw_fry_icons(self, screen: pg.Surface):
+        """
+        残り飛行回数を表示する関数
+        引数1 screen:画面Surface
+        """
+        icon_w = self.fry_icon.get_width()
+        icon_h = self.fry_icon.get_height()
+        x = self.fry_icon_margin
+        y = HEIGHT - self.fry_icon_margin - icon_h
+        for i in range(self.fry_count):
+            screen.blit(self.fry_icon, (x + i * (icon_w + self.fry_icon_spacing), y))
 
     def update(self, key_lst: list[bool], screen: pg.Surface):
         """
@@ -276,6 +294,7 @@ def main():
 
     tmr = 0
     clock = pg.time.Clock()
+    fry_count = 3
     
     while True:
         key_lst = pg.key.get_pressed()
@@ -284,7 +303,9 @@ def main():
                 return 0
             elif event.type == pg.KEYDOWN:
                 if event.key == pg.K_f:
-                    koukaman.fry(screen)
+                    if  fry_count > 0:
+                        koukaman.fry(screen)
+                        fry_count -= 1
                     
         screen.fill(bg_color)
         maze.draw(screen)
@@ -318,6 +339,7 @@ def main():
         koukaman.update(key_lst, screen)
         enemies.update()
         enemies.draw(screen)
+        koukaman.draw_fry_icons(screen)
         score.update(screen)
         
         pg.display.update()
