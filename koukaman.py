@@ -34,8 +34,14 @@ class Pacman(pg.sprite.Sprite):
         """
         super().__init__()
         self.maze = maze
-        img = pg.transform.rotozoom(pg.image.load(f"fig/2.png"), 0, 0.9)
-        self.image = pg.transform.flip(img, True, False)
+        # 画像読み込み（エラー回避）
+        try:
+            img = pg.transform.rotozoom(pg.image.load(f"fig/2.png"), 0, 0.9)
+            self.image = pg.transform.flip(img, True, False)
+        except FileNotFoundError:
+            self.image = pg.Surface((CELL_SIZE, CELL_SIZE))
+            self.image.fill((255, 0, 0))
+
         self.rect = self.image.get_rect()
         self.grid_x, self.grid_y = xy
         self.rect.center = (self.grid_x * CELL_SIZE + CELL_SIZE//2, 
@@ -52,6 +58,12 @@ class Pacman(pg.sprite.Sprite):
         self.fry_icon_margin = 10
         self.fry_icon_spacing = 8
 
+        
+        # 追加機能用フラグ：吸い込みスキルは1回のみ
+        self.has_suction = True
+        # 吸い込みエフェクト用タイマー
+        self.suction_timer = 0
+    
     def can_move_now(self) -> bool:
         now = pg.time.get_ticks()
         if now - self.last_move_time >= self.move_interval_ms:
@@ -118,6 +130,11 @@ class Pacman(pg.sprite.Sprite):
         引数1 key_lst：押下キーの真理値リスト
         引数2 screen：画面Surface
         """
+        # 吸い込みエフェクト描画
+        if self.suction_timer > 0:
+            pg.draw.circle(screen, (0, 255, 255), self.rect.center, 3.5 * CELL_SIZE, 5)
+            self.suction_timer -= 1
+
         if not self.can_move_now():
             screen.blit(self.image, self.rect)
             return
@@ -139,6 +156,42 @@ class Pacman(pg.sprite.Sprite):
         
         screen.blit(self.image, self.rect)
 
+    # ----------------------------------------------------
+    # 追加機能：吸い込みスキル（担当：渡辺）
+    # 条件：7x7マス、エフェクト表示、1回のみ
+    # ----------------------------------------------------
+    def suck_cookies(self):
+        """
+        周囲のクッキーを吸い込む
+        戻り値：吸い込んだ（食べた）クッキーの数
+        """
+        # すでに使用済みなら何もしない
+        if not self.has_suction:
+            return 0
+            
+        suck_range = 3  # 半径3マス（中心含め7x7）
+        eaten_count = 0
+        
+        # エフェクト表示時間をセット（30フレーム）
+        self.suction_timer = 30
+
+        # 範囲内のマスを走査
+        for dy in range(-suck_range, suck_range + 1):
+            for dx in range(-suck_range, suck_range + 1):
+                tx, ty = self.grid_x + dx, self.grid_y + dy
+                
+                # 迷路の範囲内チェック
+                if 0 <= ty < len(self.maze) and 0 <= tx < len(self.maze[0]):
+                    # クッキー(0)があれば食べる
+                    if self.maze[ty][tx] == 0:
+                        self.maze[ty][tx] = 2  # 空にする
+                        eaten_count += 1
+        
+        # 使用済みフラグを立てる（以降使えない）
+        self.has_suction = False
+        return eaten_count
+    # ----------------------------------------------------
+
 
 class Enemy(pg.sprite.Sprite):
     """
@@ -153,7 +206,13 @@ class Enemy(pg.sprite.Sprite):
         """
         super().__init__()
         self.maze = maze
-        self.image = pg.transform.rotozoom(pg.image.load(f"fig/{img_name}"), 0, 0.1)
+        try:
+            img = pg.image.load(f"fig/{img_name}")
+            self.image = pg.transform.rotozoom(img, 0, 0.1) 
+        except FileNotFoundError:
+            self.image = pg.Surface((CELL_SIZE, CELL_SIZE))
+            self.image.fill((0, 0, 255))
+
         self.rect = self.image.get_rect()
         self.grid_x, self.grid_y = xy
         self.rect.center = (self.grid_x * CELL_SIZE + CELL_SIZE//2,
@@ -312,6 +371,7 @@ def main():
     score = Score()
     koukaman = Pacman(maze.data, (1, 1))
     enemies = pg.sprite.Group()
+    # 敵の画像が手元にない場合エラーになるので、ファイル名を確認してください
     enemies.add(Enemy(maze.data, (10, 10), "かまトゥ.png"))
     enemies.add(Enemy(maze.data, (12, 10), "ぱっちぃ.png"))
     warp = Warp(maze.data)
@@ -349,6 +409,23 @@ def main():
             score.add(10)
             maze.data[koukaman.grid_y][koukaman.grid_x] = 2
         
+        
+        # --- 追加機能：吸い込みスキル（担当：渡辺） ---
+        if key_lst[pg.K_s]:
+            n = koukaman.suck_cookies()
+            score.add(n * 10)
+        # ----------------------------------------
+        
+        # # 通常の移動で食べたクッキーの加算
+        # if maze.data[koukaman.grid_y][koukaman.grid_x] == 2:
+        #     score.add(10)
+        #     maze.data[koukaman.grid_y][koukaman.grid_x] = 2
+        
+        #         # --- 追加機能：吸い込みスキル（担当：渡辺） ---
+        # if key_lst[pg.K_s]:
+        #     n = koukaman.suck_cookies()
+        #     score.add(n * 10)
+        # # ----------------------------------------
 
                     
         # 敵との衝突判定
