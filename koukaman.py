@@ -63,6 +63,8 @@ class Pacman(pg.sprite.Sprite):
         self.has_suction = True
         # 吸い込みエフェクト用タイマー
         self.suction_timer = 0
+        self.move_interval_ms = 120
+        self.last_move_time = 0
     
     def can_move_now(self) -> bool:
         now = pg.time.get_ticks()
@@ -219,11 +221,15 @@ class Enemy(pg.sprite.Sprite):
                            self.grid_y * CELL_SIZE + CELL_SIZE//2)
         self.move_timer = 0
         self.move_interval = 10
+        self.is_stopped = False  # 停止フラグ
 
     def update(self):
         """
-        敵をランダムに移動させる
+        敵をランダムに移動させる（停止中は動かない）
         """
+        if self.is_stopped:  # 停止中は移動しない
+            return
+            
         self.move_timer += 1
         if self.move_timer >= self.move_interval:
             self.move_timer = 0
@@ -311,6 +317,7 @@ class Maze:
         """
         迷路データを初期化
         0:クッキー, 1:壁, 2:空, 3:外枠 ,5:ポータル
+        0:クッキー, 1:壁, 2:空, 3:外枠, 4:時を止めるアイテム
         """
         self.data = [
             [3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],
@@ -319,17 +326,17 @@ class Maze:
             [3,0,1,1,1,0,1,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1,3],
             [3,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1,3],
             [3,0,1,0,0,1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,3],
-            [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,3],
+            [3,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,3],
             [3,1,1,1,1,0,1,0,1,1,1,0,1,1,1,0,0,1,1,1,1,1,1,3],
             [3,1,1,1,1,0,1,0,1,0,0,0,0,0,1,0,0,1,1,1,1,1,1,3],
             [5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
             [3,1,1,1,1,0,1,0,1,0,0,0,0,0,1,0,0,1,1,1,1,1,1,3],
             [3,1,1,1,1,0,1,0,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,3],
-            [3,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,3],
+            [3,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,4,0,0,0,1,3],
             [3,1,1,0,0,1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,1,1,1,3],
             [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,3],
             [3,1,1,0,0,1,1,0,1,1,1,1,1,1,1,0,1,1,0,1,1,0,1,3],
-            [3,1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,1,0,1,1,0,1,3],
+            [3,1,1,0,4,0,1,0,0,0,0,0,0,0,0,0,1,1,0,1,1,0,1,3],
             [3,0,0,0,0,0,0,0,0,0,0,1,0,1,1,0,1,1,0,0,0,0,1,3],
             [3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3],
             [3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3]
@@ -337,6 +344,10 @@ class Maze:
         self.wall_color = (0, 0, 255)
         self.cookie_color = (255, 255, 0) 
         self.portal_color = (255, 255, 255)  # ポータルの色
+        self.cookie_color = (255, 255, 0)
+        # 時を止めるアイテムの画像を読み込む
+        time_stop_img = pg.image.load("fig/時を止めるアイテム.png")
+        self.time_stop_img = pg.transform.scale(time_stop_img, (CELL_SIZE, CELL_SIZE))
 
     def draw(self, screen: pg.Surface):
         """迷路とクッキーを描画"""
@@ -353,6 +364,9 @@ class Maze:
                 elif self.data[y][x] == 5:
                     # ポータルを描画
                     pass  # ポータルは背景と同じ色で描画しない
+                elif self.data[y][x] == 4:
+                    # 時を止めるアイテムを画像で描画
+                    screen.blit(self.time_stop_img, (x * CELL_SIZE, y * CELL_SIZE))
 
     def count_cookies(self) -> int:
         """残りのクッキー数をカウント"""
@@ -376,7 +390,10 @@ def main():
     enemies.add(Enemy(maze.data, (12, 10), "ぱっちぃ.png"))
     warp = Warp(maze.data)
     
-    koukaman_group = pg.sprite.GroupSingle(koukaman)
+    # 時を止める効果の管理
+    time_stop_active = False
+    time_stop_start = 0
+    time_stop_duration = 5000  # 5秒間停止
 
     clock = pg.time.Clock()
     fry_count = 3
@@ -408,6 +425,24 @@ def main():
         if maze.data[koukaman.grid_y][koukaman.grid_x] == 0:
             score.add(10)
             maze.data[koukaman.grid_y][koukaman.grid_x] = 2
+        
+        # 時を止めるアイテムを取得した場合
+        if maze.data[koukaman.grid_y][koukaman.grid_x] == 4:
+            maze.data[koukaman.grid_y][koukaman.grid_x] = 2
+            time_stop_active = True
+            time_stop_start = pg.time.get_ticks()
+            # すべての敵を停止
+            for enemy in enemies:
+                enemy.is_stopped = True
+        
+        # 時を止める効果の時間管理
+        if time_stop_active:
+            current_time = pg.time.get_ticks()
+            if current_time - time_stop_start >= time_stop_duration:
+                time_stop_active = False
+                # すべての敵を再開
+                for enemy in enemies:
+                    enemy.is_stopped = False
         
         
         # --- 追加機能：吸い込みスキル（担当：渡辺） ---
