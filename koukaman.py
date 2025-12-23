@@ -22,10 +22,6 @@ class Pacman(pg.sprite.Sprite):
         pg.K_RIGHT: (+1, 0),
     }
 
-
-    
-        
-
     def __init__(self, maze: list, xy: tuple[int, int]):
         """
         こうかとん画像Surfaceを生成する
@@ -57,7 +53,6 @@ class Pacman(pg.sprite.Sprite):
         self.fry_icon = pg.transform.smoothscale(icon_6, (24, 24))
         self.fry_icon_margin = 10
         self.fry_icon_spacing = 8
-
         
         # 追加機能用フラグ：吸い込みスキルは1回のみ
         self.has_suction = True
@@ -248,6 +243,7 @@ class Enemy(pg.sprite.Sprite):
                                           self.grid_y * CELL_SIZE + CELL_SIZE//2)
                         break
 
+
 class Warp:
     """
     画面の端に行くと反対側に出てくるワープに関するクラス
@@ -287,6 +283,7 @@ class Warp:
                 pacman.grid_y * CELL_SIZE + CELL_SIZE // 2
             )
 
+
 class Score:
     """
     食べたクッキーの数をスコアとして表示するクラス
@@ -316,8 +313,7 @@ class Maze:
     def __init__(self):
         """
         迷路データを初期化
-        0:クッキー, 1:壁, 2:空, 3:外枠 ,5:ポータル
-        0:クッキー, 1:壁, 2:空, 3:外枠, 4:時を止めるアイテム
+        0:クッキー, 1:壁, 2:空, 3:外枠, 4:時を止めるアイテム, 5:ポータル
         """
         self.data = [
             [3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],
@@ -344,7 +340,6 @@ class Maze:
         self.wall_color = (0, 0, 255)
         self.cookie_color = (255, 255, 0) 
         self.portal_color = (255, 255, 255)  # ポータルの色
-        self.cookie_color = (255, 255, 0)
         # 時を止めるアイテムの画像を読み込む
         time_stop_img = pg.image.load("fig/時を止めるアイテム.png")
         self.time_stop_img = pg.transform.scale(time_stop_img, (CELL_SIZE, CELL_SIZE))
@@ -447,24 +442,11 @@ def main():
                 for enemy in enemies:
                     enemy.is_stopped = False
         
-        
         # --- 追加機能：吸い込みスキル（担当：渡辺） ---
         if key_lst[pg.K_s]:
             n = koukaman.suck_cookies()
             score.add(n * 10)
         # ----------------------------------------
-        
-        # # 通常の移動で食べたクッキーの加算
-        # if maze.data[koukaman.grid_y][koukaman.grid_x] == 2:
-        #     score.add(10)
-        #     maze.data[koukaman.grid_y][koukaman.grid_x] = 2
-        
-        #         # --- 追加機能：吸い込みスキル（担当：渡辺） ---
-        # if key_lst[pg.K_s]:
-        #     n = koukaman.suck_cookies()
-        #     score.add(n * 10)
-        # # ----------------------------------------
-
                     
         # 敵との衝突判定
         for enemy in enemies:
@@ -484,6 +466,7 @@ def main():
             text = font.render("CLEAR!", True, (0, 255, 0))
             text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2))
             screen.blit(text, text_rect)
+            #  経過時間の計算
             ms = pg.time.get_ticks()-strt_ms
             total = ms//1000
             minutes = total//60
