@@ -117,6 +117,44 @@ class Enemy(pg.sprite.Sprite):
                                           self.grid_y * CELL_SIZE + CELL_SIZE//2)
                         break
 
+class Warp:
+    """
+    画面の端に行くと反対側に出てくるワープに関するクラス
+    """
+    def __init__(self, maze):
+        self.maze = maze
+        self.warp_row = 9  # ワープがある行
+        self.left = 0
+        self.right = 0
+
+        # 左側のワープを探す
+        for x in range(len(maze[self.warp_row])):
+            if maze[self.warp_row][x] == 5:
+                self.left = x
+                break
+
+        # 右側のワープを探す
+        for x in range(len(maze[self.warp_row]) - 1, -1, -1):
+            if maze[self.warp_row][x] == 5:
+                self.right = x
+                break
+
+    def check_and_warp(self, pacman):
+        # ワープの行にいるときだけ判定
+        if pacman.grid_y == self.warp_row:
+
+            # 左端に来たら右側へ
+            if pacman.grid_x == self.left:
+                pacman.grid_x = self.right - 1
+
+            # 右端に来たら左側へ
+            elif pacman.grid_x == self.right: 
+                pacman.grid_x = self.left + 1
+
+            pacman.rect.center = (
+                pacman.grid_x * CELL_SIZE + CELL_SIZE // 2,
+                pacman.grid_y * CELL_SIZE + CELL_SIZE // 2
+            )
 
 class Score:
     """
@@ -147,7 +185,7 @@ class Maze:
     def __init__(self):
         """
         迷路データを初期化
-        0:クッキー, 1:壁, 2:空, 3:外枠
+        0:クッキー, 1:壁, 2:空, 3:外枠 ,5:ポータル
         """
         self.data = [
             [3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],
@@ -159,7 +197,7 @@ class Maze:
             [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,3],
             [3,1,1,1,1,0,1,0,1,1,1,0,1,1,1,0,0,1,1,1,1,1,1,3],
             [3,1,1,1,1,0,1,0,1,0,0,0,0,0,1,0,0,1,1,1,1,1,1,3],
-            [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,3],
+            [5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5],
             [3,1,1,1,1,0,1,0,1,0,0,0,0,0,1,0,0,1,1,1,1,1,1,3],
             [3,1,1,1,1,0,1,0,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,3],
             [3,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,3],
@@ -172,7 +210,8 @@ class Maze:
             [3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3]
         ]
         self.wall_color = (0, 0, 255)
-        self.cookie_color = (255, 255, 0)
+        self.cookie_color = (255, 255, 0) 
+        self.portal_color = (255, 255, 255)  # ポータルの色
 
     def draw(self, screen: pg.Surface):
         """迷路とクッキーを描画"""
@@ -186,6 +225,9 @@ class Maze:
                     # クッキーを描画
                     pg.draw.circle(screen, self.cookie_color,
                                  (x * CELL_SIZE + CELL_SIZE//2, y * CELL_SIZE + CELL_SIZE//2), 3)
+                elif self.data[y][x] == 5:
+                    # ポータルを描画
+                    pass  # ポータルは背景と同じ色で描画しない
 
     def count_cookies(self) -> int:
         """残りのクッキー数をカウント"""
@@ -206,6 +248,9 @@ def main():
     enemies = pg.sprite.Group()
     enemies.add(Enemy(maze.data, (10, 10), "かまトゥ.png"))
     enemies.add(Enemy(maze.data, (12, 10), "ぱっちぃ.png"))
+    warp = Warp(maze.data)
+    
+    koukaman_group = pg.sprite.GroupSingle(koukaman)
 
     clock = pg.time.Clock()
     
@@ -223,12 +268,16 @@ def main():
         
         screen.fill(bg_color)
         maze.draw(screen)
-        
+
+        koukaman.update(key_lst, screen)
+        warp.check_and_warp(koukaman)
         # こうかまんがクッキーを食べたらスコア加算
         if maze.data[koukaman.grid_y][koukaman.grid_x] == 0:
             score.add(10)
             maze.data[koukaman.grid_y][koukaman.grid_x] = 2
         
+
+                    
         # 敵との衝突判定
         for enemy in enemies:
             if koukaman.grid_x == enemy.grid_x and koukaman.grid_y == enemy.grid_y:
