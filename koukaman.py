@@ -1,4 +1,3 @@
-import math
 import os
 import random
 import sys
@@ -10,20 +9,6 @@ WIDTH = 720  # ゲームウィンドウの幅
 HEIGHT = 570  # ゲームウィンドウの高さ
 CELL_SIZE = 30  # セルサイズ
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
-
-def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
-    """
-    オブジェクトが画面内or画面外を判定し，真理値タプルを返す関数
-    引数：こうかまんや敵などのRect
-    戻り値：横方向，縦方向のはみ出し判定結果（画面内：True／画面外：False）
-    """
-    yoko, tate = True, True
-    if obj_rct.left < 0 or WIDTH < obj_rct.right:
-        yoko = False
-    if obj_rct.top < 0 or HEIGHT < obj_rct.bottom:
-        tate = False
-    return yoko, tate
 
 
 class Pacman(pg.sprite.Sprite):
@@ -51,7 +36,6 @@ class Pacman(pg.sprite.Sprite):
         self.grid_x, self.grid_y = xy
         self.rect.center = (self.grid_x * CELL_SIZE + CELL_SIZE//2, 
                            self.grid_y * CELL_SIZE + CELL_SIZE//2)
-        self.speed = 5
         self.move_interval_ms = 120
         self.last_move_time = 0
     
@@ -72,7 +56,7 @@ class Pacman(pg.sprite.Sprite):
             screen.blit(self.image, self.rect)
             return
         
-        for k, mv in __class__.delta.items():
+        for k, mv in self.delta.items():
             if key_lst[k]:
                 new_grid_x = self.grid_x + mv[0]
                 new_grid_y = self.grid_y + mv[1]
@@ -85,9 +69,6 @@ class Pacman(pg.sprite.Sprite):
                         self.grid_y = new_grid_y
                         self.rect.center = (self.grid_x * CELL_SIZE + CELL_SIZE//2,
                                           self.grid_y * CELL_SIZE + CELL_SIZE//2)
-                        # クッキーを食べる
-                        if self.maze[self.grid_y][self.grid_x] == 0:
-                            self.maze[self.grid_y][self.grid_x] = 2
                 break
         
         screen.blit(self.image, self.rect)
@@ -271,7 +252,6 @@ def main():
     
     koukaman_group = pg.sprite.GroupSingle(koukaman)
 
-    tmr = 0
     clock = pg.time.Clock()
     
     while True:
@@ -279,6 +259,12 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
+            if event.type == pg.KEYDOWN and event.key == pg.K_d:  # Dキーが押されたら
+                if score.value >= 300:  # スコア300以上だったら
+                    score.add(-300)  # スコア300使用してダッシュ
+                    koukaman.move_interval_ms = 10
+            if event.type == pg.KEYUP and event.key == pg.K_d:  # Dキーが離されたら通常スピード
+                koukaman.move_interval_ms = 120
         
         screen.fill(bg_color)
         maze.draw(screen)
@@ -286,8 +272,9 @@ def main():
         koukaman.update(key_lst, screen)
         warp.check_and_warp(koukaman)
         # こうかまんがクッキーを食べたらスコア加算
-        if maze.data[koukaman.grid_y][koukaman.grid_x] == 2:
+        if maze.data[koukaman.grid_y][koukaman.grid_x] == 0:
             score.add(10)
+            maze.data[koukaman.grid_y][koukaman.grid_x] = 2
         
 
                     
@@ -319,7 +306,6 @@ def main():
         score.update(screen)
         
         pg.display.update()
-        tmr += 1
         clock.tick(50)
 
 
